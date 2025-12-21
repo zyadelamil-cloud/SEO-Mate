@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Generator from './pages/Generator';
-import ImageStudio from './pages/ImageStudio';
-import Library from './pages/Library';
-import Settings from './pages/Settings';
-import Billing from './pages/Billing';
-import Login from './pages/Login';
-import Account from './pages/Account';
-import { UserSubscription, GeneratedArticle, GeneratedImage } from './types';
-import { translations } from './services/i18n';
-import { supabase } from './services/supabase';
+import Dashboard from './pages/Dashboard.tsx';
+import Generator from './pages/Generator.tsx';
+import ImageStudio from './pages/ImageStudio.tsx';
+import Library from './pages/Library.tsx';
+import Settings from './pages/Settings.tsx';
+import Billing from './pages/Billing.tsx';
+import Login from './pages/Login.tsx';
+import Account from './pages/Account.tsx';
+import { UserSubscription, GeneratedArticle, GeneratedImage } from './types.ts';
+import { translations } from './services/i18n.ts';
+import { supabase } from './services/supabase.ts';
 import { 
   LayoutDashboard, 
   PenTool, 
@@ -149,8 +149,12 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState<'fr' | 'en'>(() => {
-    const savedApi = localStorage.getItem('seomate_api');
-    return savedApi ? JSON.parse(savedApi).siteLanguage || 'fr' : 'fr';
+    try {
+      const savedApi = localStorage.getItem('seomate_api');
+      return savedApi ? JSON.parse(savedApi).siteLanguage || 'fr' : 'fr';
+    } catch {
+      return 'fr';
+    }
   });
 
   const t = useMemo(() => translations[lang], [lang]);
@@ -164,7 +168,7 @@ const App: React.FC = () => {
       setSession(session);
       if (session) fetchUserData(session.user.id);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
 
     const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -181,13 +185,13 @@ const App: React.FC = () => {
   }, []);
 
   const fetchUserData = async (userId: string) => {
-    // Fetch profile and map snake_case to camelCase
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
+    // Fixed: Removed 'used_articles' key which was causing a TS error as it's not present on UserSubscription.
     if (profile) {
       setSubscription({
         planName: profile.plan_name,
@@ -199,7 +203,6 @@ const App: React.FC = () => {
       });
     }
 
-    // Fetch articles and map snake_case to camelCase
     const { data: userArticles } = await supabase
       .from('articles')
       .select('*')
@@ -221,7 +224,6 @@ const App: React.FC = () => {
       })));
     }
 
-    // Fetch image history
     const { data: userImages } = await supabase
       .from('images_history')
       .select('*')
