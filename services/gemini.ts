@@ -55,18 +55,22 @@ export const generateSEOArticle = async (
   return JSON.parse(response.text);
 };
 
-export const generateHeroImage = async (topic: string, title: string) => {
+export const generateHeroImage = async (topic: string, title: string, aspectRatio: string = "16:9") => {
   const ai = getAI();
+  // Ensure the aspect ratio is one of the supported values: "1:1", "3:4", "4:3", "9:16", "16:9"
+  const validAspectRatios = ["1:1", "3:4", "4:3", "9:16", "16:9"];
+  const finalAspectRatio = validAspectRatios.includes(aspectRatio) ? aspectRatio : "16:9";
+
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
       parts: [
-        { text: `A professional, ultra-high quality cinematic hero image for a blog post titled "${title}". Style: Minimalist 3D or high-end photography. Topic: ${topic}` }
+        { text: `A professional, ultra-high quality cinematic hero image for a blog post titled "${title}". Style: High-end professional visual. Topic: ${topic}` }
       ]
     },
     config: {
       imageConfig: {
-        aspectRatio: "16:9"
+        aspectRatio: finalAspectRatio as any
       }
     }
   });

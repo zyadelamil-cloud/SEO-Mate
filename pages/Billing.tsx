@@ -24,6 +24,8 @@ import { UserSubscription } from '../types';
 interface BillingProps {
   subscription: UserSubscription;
   setSubscription: (sub: UserSubscription) => void;
+  // Fix: Added 't' translation prop
+  t: any;
 }
 
 const plans = [
@@ -137,7 +139,8 @@ const PaymentModal = ({ plan, onClose, onConfirm }: any) => {
   );
 };
 
-const Billing: React.FC<BillingProps> = ({ subscription, setSubscription }) => {
+// Fix: Destructured 't' from props
+const Billing: React.FC<BillingProps> = ({ subscription, setSubscription, t }) => {
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -175,8 +178,8 @@ const Billing: React.FC<BillingProps> = ({ subscription, setSubscription }) => {
       )}
 
       <header>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Finance & Stratégie</h1>
-        <p className="text-slate-500 font-medium mt-2">Plan actuel : <span className="text-indigo-600 font-black">{subscription.planName}</span></p>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{t.bill_title}</h1>
+        <p className="text-slate-500 font-medium mt-2">{t.bill_current} : <span className="text-indigo-600 font-black">{subscription.planName}</span></p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
@@ -199,7 +202,7 @@ const Billing: React.FC<BillingProps> = ({ subscription, setSubscription }) => {
               {isExpert && (
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-2 rounded-full shadow-2xl flex items-center gap-2 whitespace-nowrap border-2 border-white/20">
                    <Trophy className="w-4 h-4 text-yellow-300" />
-                   <span className="text-[10px] font-black uppercase tracking-widest">Choix de l'Expert</span>
+                   <span className="text-[10px] font-black uppercase tracking-widest">{t.bill_expert_choice}</span>
                 </div>
               )}
 
@@ -230,7 +233,7 @@ const Billing: React.FC<BillingProps> = ({ subscription, setSubscription }) => {
                       €{plan.oldPrice}
                     </span>
                   )}
-                  <span className={`font-black text-xs uppercase tracking-widest ml-1 ${isExpert ? 'text-indigo-400' : 'text-slate-400'}`}>/MO</span>
+                  <span className={`font-black text-xs uppercase tracking-widest ml-1 ${isExpert ? 'text-indigo-400' : 'text-slate-400'}`}>{t.bill_month}</span>
                 </div>
               </div>
               
@@ -254,7 +257,7 @@ const Billing: React.FC<BillingProps> = ({ subscription, setSubscription }) => {
                     : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-xl'
                 }`}
               >
-                {isActive ? 'Actif' : isExpert ? 'S\'ABONNER MAINTENANT' : 'Choisir ce Pack'}
+                {isActive ? t.bill_btn_active : isExpert ? t.bill_btn_sub : t.bill_btn_choose}
                 {isExpert && !isActive && <Sparkles className="w-4 h-4 animate-pulse" />}
               </button>
             </div>

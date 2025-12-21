@@ -40,8 +40,16 @@ export interface GeneratedArticle {
   lang: string;
 }
 
+export interface GeneratedImage {
+  id: string;
+  prompt: string;
+  url: string;
+  createdAt: string;
+}
+
 export interface APIConfig {
   defaultModel: AIModelType;
   autoKeywords: boolean;
   devMode: boolean;
+  siteLanguage: 'fr' | 'en';
 }

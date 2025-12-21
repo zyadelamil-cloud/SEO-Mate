@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   User as UserIcon, 
   Save, 
@@ -9,23 +10,39 @@ import {
   Mail,
   Trophy,
   Zap,
-  ArrowRight
+  Loader2
 } from 'lucide-react';
 import { UserSubscription } from '../types';
+import { supabase } from '../services/supabase';
 
 interface AccountProps {
   subscription: UserSubscription;
   setSubscription: (sub: UserSubscription) => void;
+  t: any;
 }
 
-const Account: React.FC<AccountProps> = ({ subscription, setSubscription }) => {
+const Account: React.FC<AccountProps> = ({ subscription, setSubscription, t }) => {
+  const navigate = useNavigate();
   const [name, setName] = useState(subscription.firstName);
+  const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    setSubscription({ ...subscription, firstName: name });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ first_name: name })
+        .eq('id', session.user.id);
+      
+      if (!error) {
+        setSubscription({ ...subscription, firstName: name });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    }
+    setLoading(false);
   };
 
   const initial = name ? name.charAt(0).toUpperCase() : '?';
@@ -34,15 +51,16 @@ const Account: React.FC<AccountProps> = ({ subscription, setSubscription }) => {
     <div className="space-y-12 pb-24 animate-in fade-in duration-700">
       <header className="flex justify-between items-end">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Mon Compte</h1>
-          <p className="text-slate-500 font-medium mt-2">Personnalisez votre identité et gérez votre accès.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{t.acc_title}</h1>
+          <p className="text-slate-500 font-medium mt-2">{t.acc_subtitle}</p>
         </div>
         <button 
           onClick={handleSave}
-          className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-xl active:scale-95"
+          disabled={loading}
+          className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-xl active:scale-95 disabled:opacity-50"
         >
-          {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-          {saved ? 'Enregistré' : 'Sauvegarder'}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />)}
+          {saved ? t.acc_saved : t.acc_save}
         </button>
       </header>
 
@@ -56,7 +74,7 @@ const Account: React.FC<AccountProps> = ({ subscription, setSubscription }) => {
                 </div>
                 <h3 className="text-2xl font-black text-slate-900 tracking-tight">{subscription.firstName || 'Utilisateur'}</h3>
                 <p className="text-indigo-600 font-black text-[10px] uppercase tracking-widest mt-2 px-4 py-1.5 bg-indigo-50 rounded-full inline-block">
-                  Membre {subscription.planName}
+                  {t.acc_member} {subscription.planName}
                 </p>
                 <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-2 gap-6 w-full">
                    <div>
@@ -87,14 +105,14 @@ const Account: React.FC<AccountProps> = ({ subscription, setSubscription }) => {
              <div className="flex items-center gap-4">
                 <div className="p-4 bg-slate-900 text-white rounded-2xl"><UserIcon className="w-6 h-6" /></div>
                 <div>
-                   <h3 className="text-xl font-black text-slate-900">Informations Personnelles</h3>
+                   <h3 className="text-xl font-black text-slate-900">{t.acc_personal}</h3>
                    <p className="text-sm text-slate-400 font-bold">Ces informations sont visibles uniquement par vous.</p>
                 </div>
              </div>
 
              <div className="space-y-8">
                 <div className="space-y-3">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Modifier le Prénom</label>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">{t.acc_first_name}</label>
                    <input 
                       type="text" 
                       value={name}
@@ -103,29 +121,20 @@ const Account: React.FC<AccountProps> = ({ subscription, setSubscription }) => {
                       className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent rounded-[28px] text-lg font-bold focus:bg-white focus:border-indigo-600 outline-none transition-all shadow-inner"
                    />
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-40 grayscale cursor-not-allowed">
-                   <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-2">Email <ShieldCheck className="w-3 h-3" /></label>
-                      <div className="relative">
-                         <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                         <input disabled value="contact@premium.com" className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[28px] text-sm font-bold outline-none" />
-                      </div>
-                   </div>
-                   <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-2">Mobile <Smartphone className="w-3 h-3" /></label>
-                      <input disabled value="+33 6 00 00 00 00" className="w-full px-8 py-5 bg-slate-50 border-2 border-transparent rounded-[28px] text-sm font-bold outline-none" />
-                   </div>
-                </div>
              </div>
           </section>
 
           <div className="bg-indigo-600 rounded-[48px] p-10 text-white flex items-center justify-between shadow-3xl">
              <div>
-                <h3 className="text-2xl font-black tracking-tighter">Prêt pour le niveau supérieur ?</h3>
+                <h3 className="text-2xl font-black tracking-tighter">{t.acc_ready_next}</h3>
                 <p className="text-white/60 font-bold text-sm mt-1">Passez au pack Elite pour des articles illimités.</p>
              </div>
-             <button className="px-8 py-4 bg-white text-indigo-600 rounded-[24px] font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all">Upgrade Pro</button>
+             <button 
+                onClick={() => navigate('/billing')}
+                className="px-8 py-4 bg-white text-indigo-600 rounded-[24px] font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all"
+              >
+                {t.acc_upgrade}
+              </button>
           </div>
         </div>
       </div>

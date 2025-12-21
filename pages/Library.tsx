@@ -19,9 +19,12 @@ interface LibraryProps {
   articles: GeneratedArticle[];
   onDelete: (id: string) => void;
   subscription: UserSubscription;
+  // Fix: Added 't' translation prop
+  t: any;
 }
 
-const Library: React.FC<LibraryProps> = ({ articles, onDelete, subscription }) => {
+// Fix: Destructured 't' from props
+const Library: React.FC<LibraryProps> = ({ articles, onDelete, subscription, t }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -70,16 +73,16 @@ const Library: React.FC<LibraryProps> = ({ articles, onDelete, subscription }) =
             <Activity className="w-5 h-5 text-indigo-600" />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Gestion de Contenu</span>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Bibliothèque d'Articles</h1>
-          <p className="text-slate-500 font-medium mt-2">Gérez vos productions SEO stratégiques et optimisez votre visibilité.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{t.lib_title}</h1>
+          <p className="text-slate-500 font-medium mt-2">{t.lib_subtitle}</p>
         </div>
         
         <div className="flex gap-4">
           <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-3 px-8 py-4 rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] border-2 transition-all ${showFilters || statusFilter || langFilter ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-100 text-slate-600'}`}>
-            <Filter className="w-4 h-4" /> Filtres
+            <Filter className="w-4 h-4" /> {t.lib_filters}
           </button>
           <button onClick={() => navigate('/generate')} className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-2xl group">
-            <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" /> Nouvel Article
+            <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" /> {t.lib_new}
           </button>
         </div>
       </header>
@@ -110,7 +113,7 @@ const Library: React.FC<LibraryProps> = ({ articles, onDelete, subscription }) =
         <div className="p-8 border-b border-slate-50">
           <div className="relative">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-            <input type="text" placeholder="Rechercher un document..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[28px] text-sm font-bold focus:outline-none focus:border-indigo-100 focus:bg-white transition-all shadow-inner" />
+            <input type="text" placeholder={t.lib_search} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[28px] text-sm font-bold focus:outline-none focus:border-indigo-100 focus:bg-white transition-all shadow-inner" />
           </div>
         </div>
 
@@ -118,10 +121,10 @@ const Library: React.FC<LibraryProps> = ({ articles, onDelete, subscription }) =
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-slate-50/50 text-slate-400 text-[9px] uppercase font-black tracking-[0.4em]">
               <tr>
-                <th className="px-10 py-6">Désignation</th>
-                <th className="px-10 py-6">État</th>
-                <th className="px-10 py-6">Score SEO</th>
-                <th className="px-10 py-6 text-right">Actions</th>
+                <th className="px-10 py-6">{t.lib_th_name}</th>
+                <th className="px-10 py-6">{t.lib_th_status}</th>
+                <th className="px-10 py-6">{t.lib_th_score}</th>
+                <th className="px-10 py-6 text-right">{t.lib_th_actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
