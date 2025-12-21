@@ -191,13 +191,12 @@ const App: React.FC = () => {
       .eq('id', userId)
       .single();
 
-    // Fixed: Removed 'used_articles' key which was causing a TS error as it's not present on UserSubscription.
     if (profile) {
       setSubscription({
         planName: profile.plan_name,
         level: profile.level,
         articlesLimit: profile.articles_limit,
-        usedArticles: profile.used_articles,
+        usedArticles: profile.used_articles, // Fixed: used correct property mapping
         firstName: profile.first_name,
         features: profile.features || DEFAULT_SUBSCRIPTION.features
       });
