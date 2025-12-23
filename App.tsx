@@ -148,6 +148,7 @@ const Sidebar = ({ subscription, onLogout, t }: { subscription: UserSubscription
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [lang, setLang] = useState<'fr' | 'en'>(() => {
     try {
       const savedApi = localStorage.getItem('seomate_api');
@@ -170,10 +171,14 @@ const App: React.FC = () => {
       setLoading(false);
     }).catch(() => setLoading(false));
 
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) fetchUserData(session.user.id);
-      else {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+      }
+      if (session) {
+        fetchUserData(session.user.id);
+      } else {
         setSubscription(DEFAULT_SUBSCRIPTION);
         setArticles([]);
         setImageHistory([]);
@@ -192,7 +197,6 @@ const App: React.FC = () => {
         .eq('id', userId)
         .single();
 
-      // Si le profil n'existe pas, on le crée
       if (error && error.code === 'PGRST116') {
         const newProfile = {
           id: userId,
@@ -311,6 +315,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setIsRecoveryMode(false);
   };
 
   if (loading) return (
@@ -319,7 +324,10 @@ const App: React.FC = () => {
     </div>
   );
 
-  if (!session) return <Login onLogin={() => {}} />;
+  // Si on est en mode récupération de mot de passe, on affiche le Login avec une vue spécifique
+  if (!session || isRecoveryMode) {
+    return <Login onLogin={() => {}} forcedRecovery={isRecoveryMode} onPasswordUpdated={() => setIsRecoveryMode(false)} />;
+  }
 
   return (
     <HashRouter>

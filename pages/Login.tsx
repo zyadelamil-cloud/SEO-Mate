@@ -17,15 +17,18 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldAlert,
-  HelpCircle
+  HelpCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 interface LoginProps {
   onLogin: (firstName: string) => void;
+  forcedRecovery?: boolean;
+  onPasswordUpdated?: () => void;
 }
 
-type AuthView = 'initial' | 'verification' | 'forgot_password';
+type AuthView = 'initial' | 'verification' | 'forgot_password' | 'update_password';
 type AuthMethod = 'email' | 'phone';
 type AuthMode = 'login' | 'signup';
 
@@ -40,8 +43,8 @@ const countries = [
   { code: 'US', name: 'USA', prefix: '+1', flag: '🇺🇸' },
 ];
 
-const Login: React.FC<LoginProps> = () => {
-  const [view, setView] = useState<AuthView>('initial');
+const Login: React.FC<LoginProps> = ({ forcedRecovery, onPasswordUpdated }) => {
+  const [view, setView] = useState<AuthView>(forcedRecovery ? 'update_password' : 'initial');
   const [mode, setMode] = useState<AuthMode>('login');
   const [method, setMethod] = useState<AuthMethod>('phone');
   const [loading, setLoading] = useState(false);
@@ -52,11 +55,11 @@ const Login: React.FC<LoginProps> = () => {
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [phone, setPhone] = useState('');
   
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -78,7 +81,7 @@ const Login: React.FC<LoginProps> = () => {
 
   const handleDiscordLogin = async () => {
     if (isInIframe) {
-      setError("Veuillez cliquer sur 'Lancer' en haut de la page pour ouvrir l'app hors de l'aperçu avant de vous connecter.");
+      setError("Ouvrez l'app dans un nouvel onglet pour la connexion Discord.");
       return;
     }
 
@@ -104,12 +107,44 @@ const Login: React.FC<LoginProps> = () => {
     setLoading(true);
     setError(null);
     try {
+      // Nettoyage de l'URL pour éviter les doubles redirections
+      const redirectUrl = window.location.origin;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
       });
+      
       if (error) throw error;
-      setSuccess("Lien de réinitialisation envoyé ! Vérifiez vos emails.");
-      setTimeout(() => setView('initial'), 3000);
+      
+      setSuccess("Lien envoyé ! Vérifiez votre boîte mail (et vos spams).");
+      setTimeout(() => setView('initial'), 5000);
+    } catch (err: any) {
+      if (err.message.includes("Rate limit")) {
+        setError("Trop de tentatives. Réessayez dans quelques minutes.");
+      } else {
+        setError("Impossible d'envoyer l'email : " + err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setError("Le mot de passe doit faire au moins 6 caractères.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setSuccess("Mot de passe mis à jour !");
+      setTimeout(() => {
+        if (onPasswordUpdated) onPasswordUpdated();
+        setView('initial');
+      }, 2000);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -157,7 +192,7 @@ const Login: React.FC<LoginProps> = () => {
       }
     } catch (err: any) {
       if (err.message.includes("provider") || err.message.includes("not enabled")) {
-        setError("Le service SMS n'est pas configuré sur ce projet Supabase.");
+        setError("Le service SMS n'est pas configuré sur ce projet.");
       } else {
         setError(err.message);
       }
@@ -208,21 +243,16 @@ const Login: React.FC<LoginProps> = () => {
       <div className="w-full max-w-xl animate-in fade-in zoom-in duration-700">
         
         {isInIframe && (
-          <div className="mb-6 bg-amber-500 text-white p-5 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/20 animate-in slide-in-from-top duration-500">
+          <div className="mb-6 bg-amber-500 text-white p-5 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/20">
             <div className="flex items-center gap-4">
-              <div className="bg-white/20 p-2 rounded-xl">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest">Aperçu Restreint</p>
-                <p className="text-[9px] font-bold opacity-80 uppercase tracking-tighter">Ouvrez l'app dans un nouvel onglet pour la connexion</p>
-              </div>
+              <ShieldAlert className="w-5 h-5" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Utilisez le mode 'Lancer' pour vous connecter</p>
             </div>
             <button 
               onClick={() => window.open(window.location.href, '_blank')} 
-              className="bg-white text-amber-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all shadow-lg active:scale-95"
+              className="bg-white text-amber-600 px-6 py-2 rounded-2xl text-[10px] font-black uppercase shadow-lg"
             >
-              Lancer <ExternalLink className="w-4 h-4" />
+              Lancer <ExternalLink className="w-3 h-3 ml-2" />
             </button>
           </div>
         )}
@@ -391,6 +421,30 @@ const Login: React.FC<LoginProps> = () => {
                 </div>
                 <button disabled={loading} type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-indigo-600 transition-all disabled:opacity-50 active:scale-95">
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Réinitialiser'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {view === 'update_password' && (
+            <div className="animate-in slide-in-from-bottom duration-700">
+              <div className="text-center mb-12">
+                <div className="w-20 h-20 bg-indigo-600 text-white rounded-[28px] flex items-center justify-center mx-auto mb-8 shadow-2xl">
+                  <Lock className="w-10 h-10" />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Nouveau Mot de Passe</h2>
+                <p className="text-slate-500 font-medium px-10">Définissez un nouveau mot de passe sécurisé pour votre compte.</p>
+              </div>
+              <form onSubmit={handleUpdatePassword} className="space-y-8">
+                <div className="relative group">
+                  <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
+                  <input required type={showNewPassword ? "text" : "password"} placeholder="Nouveau mot de passe" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full pl-16 pr-14 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" />
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300">
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <button disabled={loading} type="submit" className="w-full py-6 bg-indigo-600 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-slate-900 transition-all disabled:opacity-50 active:scale-95">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Mettre à jour'}
                 </button>
               </form>
             </div>
