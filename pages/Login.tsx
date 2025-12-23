@@ -15,7 +15,8 @@ import {
   Smartphone,
   MessageSquare,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -62,7 +63,6 @@ const Login: React.FC<LoginProps> = () => {
   const countryPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Detect if the app is inside an iframe (which blocks many OAuth flows like Discord)
     setIsInIframe(window.self !== window.top);
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -75,10 +75,15 @@ const Login: React.FC<LoginProps> = () => {
   }, []);
 
   const handleDiscordLogin = async () => {
+    // Si on est dans une iframe, on doit prévenir que la redirection risque d'échouer
+    if (isInIframe) {
+      setError("Veuillez cliquer sur 'Lancer' en haut de la page pour ouvrir l'app hors de l'aperçu avant de vous connecter.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      // Note: If redirect fails with localhost, check Supabase Dashboard -> Auth -> URL Configuration
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
@@ -95,13 +100,6 @@ const Login: React.FC<LoginProps> = () => {
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (method === 'email' && mode === 'signup') {
-      if (!firstName) return setError("Le prénom est requis.");
-      if (password !== confirmPassword) return setError("Les mots de passe ne correspondent pas.");
-      if (password.length < 6) return setError("Le mot de passe doit faire au moins 6 caractères.");
-    }
-    
     setLoading(true);
 
     try {
@@ -113,6 +111,7 @@ const Login: React.FC<LoginProps> = () => {
             options: { data: { first_name: firstName } }
           });
           if (signUpError) throw signUpError;
+          setError("Vérifiez vos emails pour confirmer l'inscription.");
         } else {
           const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
           if (signInError) throw signInError;
@@ -134,9 +133,9 @@ const Login: React.FC<LoginProps> = () => {
       }
     } catch (err: any) {
       if (err.message.includes("provider") || err.message.includes("not enabled")) {
-        setError("L'authentification par SMS n'est pas activée. Vérifiez votre console Supabase.");
+        setError("Le service SMS n'est pas configuré sur ce projet Supabase.");
       } else {
-        setError(err.message || "Une erreur est survenue.");
+        setError(err.message);
       }
     } finally {
       setLoading(false);
@@ -161,7 +160,7 @@ const Login: React.FC<LoginProps> = () => {
 
   const handleVerify = async () => {
     const code = otp.join('');
-    if (code.length < 6) return setError("Veuillez entrer le code de 6 chiffres.");
+    if (code.length < 6) return;
 
     setError(null);
     setLoading(true);
@@ -173,12 +172,8 @@ const Login: React.FC<LoginProps> = () => {
       });
       
       if (verifyError) throw verifyError;
-
-      if (mode === 'signup' && firstName && data?.user) {
-        await supabase.from('profiles').update({ first_name: firstName }).eq('id', data.user.id);
-      }
     } catch (err: any) {
-      setError("Code incorrect ou expiré.");
+      setError("Code invalide ou expiré.");
     } finally {
       setLoading(false);
     }
@@ -188,20 +183,23 @@ const Login: React.FC<LoginProps> = () => {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-2xl">
       <div className="w-full max-w-xl animate-in fade-in zoom-in duration-700">
         
-        {/* Connection Hint for Iframe users */}
+        {/* Barre d'alerte Iframe améliorée */}
         {isInIframe && (
-          <div className="mb-6 bg-indigo-600 text-white p-5 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/20">
+          <div className="mb-6 bg-amber-500 text-white p-5 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/20 animate-in slide-in-from-top duration-500">
             <div className="flex items-center gap-4">
               <div className="bg-white/20 p-2 rounded-xl">
-                <AlertCircle className="w-5 h-5" />
+                <ShieldAlert className="w-5 h-5" />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Ouvrez l'application en grand pour Discord</p>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest">Aperçu Restreint</p>
+                <p className="text-[9px] font-bold opacity-80 uppercase tracking-tighter">Ouvrez l'app dans un nouvel onglet pour la connexion</p>
+              </div>
             </div>
             <button 
               onClick={() => window.open(window.location.href, '_blank')} 
-              className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all shadow-lg"
+              className="bg-white text-amber-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-all shadow-lg active:scale-95"
             >
-              Lancer <ExternalLink className="w-3 h-3" />
+              Lancer <ExternalLink className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -213,7 +211,7 @@ const Login: React.FC<LoginProps> = () => {
               <div className="bg-red-500 text-white px-8 py-5 flex items-center justify-between shadow-2xl">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 shrink-0" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">{error}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest leading-tight">{error}</p>
                 </div>
                 <button onClick={() => setError(null)} className="p-1 hover:bg-white/20 rounded-lg">
                   <X className="w-4 h-4" />
@@ -228,12 +226,8 @@ const Login: React.FC<LoginProps> = () => {
                 <div className="bg-slate-900 p-5 rounded-[32px] shadow-2xl mb-8 animate-floating">
                   <TrendingUp className="text-white w-10 h-10" />
                 </div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-4">
-                  {mode === 'login' ? 'Content Forge' : 'Join the Elite'}
-                </h1>
-                <p className="text-slate-500 font-medium">
-                  {mode === 'login' ? 'Propulsez votre SEO avec l\'IA.' : 'Créez votre compte expert maintenant.'}
-                </p>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-4">SEO-Mate AI</h1>
+                <p className="text-slate-500 font-medium">L'IA qui forge votre visibilité.</p>
               </div>
 
               <div className="flex p-1.5 bg-slate-100 rounded-[28px] mb-10">
@@ -241,7 +235,7 @@ const Login: React.FC<LoginProps> = () => {
                   onClick={() => setMethod('phone')}
                   className={`flex-1 py-4 rounded-[24px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${method === 'phone' ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400'}`}
                 >
-                  <Smartphone className="w-4 h-4" /> Phone
+                  <Smartphone className="w-4 h-4" /> SMS
                 </button>
                 <button 
                   onClick={() => setMethod('email')}
@@ -255,14 +249,7 @@ const Login: React.FC<LoginProps> = () => {
                 {mode === 'signup' && (
                   <div className="relative group">
                     <UserIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                    <input 
-                      required
-                      type="text" 
-                      placeholder="Prénom" 
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" 
-                    />
+                    <input required type="text" placeholder="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" />
                   </div>
                 )}
 
@@ -270,117 +257,59 @@ const Login: React.FC<LoginProps> = () => {
                   <>
                     <div className="relative group">
                       <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                      <input 
-                        required
-                        type="email" 
-                        placeholder="Email professionnel" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" 
-                      />
+                      <input required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" />
                     </div>
                     <div className="relative group">
                       <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                      <input 
-                        required
-                        type={showPassword ? "text" : "password"} 
-                        placeholder="Mot de passe" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-16 pr-14 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" 
-                      />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600">
+                      <input required type={showPassword ? "text" : "password"} placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-16 pr-14 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300">
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>
-                    {mode === 'signup' && (
-                      <div className="relative group">
-                        <ShieldCheck className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                        <input 
-                          required
-                          type={showConfirmPassword ? "text" : "password"} 
-                          placeholder="Confirmer le mot de passe" 
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full pl-16 pr-14 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" 
-                        />
-                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600">
-                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <div className="flex gap-4">
-                    <div className="relative shrink-0" ref={countryPickerRef}>
-                      <button 
-                        type="button"
-                        onClick={() => setShowCountryPicker(!showCountryPicker)}
-                        className="h-full px-6 bg-slate-50 border-2 border-transparent rounded-[24px] flex items-center gap-3 font-black text-sm hover:border-indigo-100 transition-all shadow-inner"
-                      >
+                    <div className="relative" ref={countryPickerRef}>
+                      <button type="button" onClick={() => setShowCountryPicker(!showCountryPicker)} className="h-[72px] px-6 bg-slate-50 border-2 border-transparent rounded-[24px] flex items-center gap-3 font-black text-sm shadow-inner">
                         <span>{selectedCountry.flag}</span>
                         <span className="text-slate-400">{selectedCountry.prefix}</span>
                       </button>
                       {showCountryPicker && (
-                        <div className="absolute top-full left-0 mt-4 w-64 bg-white rounded-[32px] shadow-4xl border border-slate-100 p-3 z-[120] max-h-80 overflow-y-auto scrollbar-hide animate-in slide-in-from-top-4 duration-300">
+                        <div className="absolute top-full left-0 mt-4 w-64 bg-white rounded-[32px] shadow-4xl border border-slate-100 p-3 z-[120] max-h-80 overflow-y-auto scrollbar-hide">
                           {countries.map((c) => (
                             <button key={c.code} type="button" onClick={() => { setSelectedCountry(c); setShowCountryPicker(false); }} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-all">
-                              <div className="flex items-center gap-3">
-                                <span>{c.flag}</span>
-                                <span className="text-xs font-black text-slate-900">{c.name}</span>
-                              </div>
+                              <div className="flex items-center gap-3"><span>{c.flag}</span><span className="text-xs font-black text-slate-900">{c.name}</span></div>
                               <span className="text-[10px] font-bold text-indigo-600">{c.prefix}</span>
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <div className="relative flex-1 group">
-                      <Smartphone className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                      <input 
-                        required
-                        type="tel" 
-                        placeholder="6 12 34 56 78" 
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full pl-16 pr-8 py-5 bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" 
-                      />
-                    </div>
+                    <input required type="tel" placeholder="6 12 34 56 78" value={phone} onChange={(e) => setPhone(e.target.value)} className="flex-1 px-8 py-5 h-[72px] bg-slate-50 border-2 border-transparent rounded-[24px] text-sm font-bold focus:outline-none focus:border-indigo-600 focus:bg-white transition-all shadow-inner" />
                   </div>
                 )}
 
-                <button 
-                  disabled={loading}
-                  type="submit" 
-                  className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-indigo-600 transition-all disabled:opacity-50 active:scale-95"
-                >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (mode === 'login' ? 'Accéder à la Forge' : 'Créer mon Compte')}
+                <button disabled={loading} type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-indigo-600 transition-all disabled:opacity-50 active:scale-95">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (method === 'phone' ? 'Recevoir un code' : 'Connexion')}
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </form>
 
               <div className="mt-10 flex items-center gap-6">
                 <div className="flex-1 h-px bg-slate-100"></div>
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Ou continuer avec</span>
+                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Ou</span>
                 <div className="flex-1 h-px bg-slate-100"></div>
               </div>
 
-              <div className="mt-10">
-                <button 
-                  onClick={handleDiscordLogin}
-                  disabled={loading}
-                  className="w-full py-5 bg-[#5865F2] text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-[#4752C4] transition-all shadow-xl"
-                >
+              <div className="mt-8 space-y-4">
+                <button onClick={handleDiscordLogin} disabled={loading} className="w-full py-5 bg-[#5865F2] text-white rounded-[24px] font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-4 hover:brightness-110 transition-all shadow-xl active:scale-95">
                   <MessageSquare className="w-5 h-5" /> Discord Pro Access
                 </button>
               </div>
 
               <div className="mt-10 text-center">
-                <button 
-                  onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                  className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-indigo-600 transition-colors"
-                >
-                  {mode === 'login' ? 'Pas encore de compte ? Rejoindre l\'élite' : 'Déjà membre ? Se connecter'}
+                <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] hover:text-indigo-600 transition-colors">
+                  {mode === 'login' ? 'Créer un compte' : 'Déjà membre ?'}
                 </button>
               </div>
             </>
@@ -388,10 +317,9 @@ const Login: React.FC<LoginProps> = () => {
 
           {view === 'verification' && (
             <div className="animate-in slide-in-from-right duration-500">
-              <button onClick={() => setView('initial')} className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors mb-10 group">
-                <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Retour
+              <button onClick={() => setView('initial')} className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors mb-10">
+                <ChevronLeft className="w-4 h-4" /> Retour
               </button>
-              
               <div className="text-center mb-12">
                 <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-[28px] flex items-center justify-center mx-auto mb-8 shadow-inner">
                   <ShieldCheck className="w-10 h-10" />
@@ -399,38 +327,14 @@ const Login: React.FC<LoginProps> = () => {
                 <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Vérification</h2>
                 <p className="text-slate-500 font-medium">Code envoyé au {selectedCountry.prefix} {phone}</p>
               </div>
-
               <div className="flex justify-between gap-3 mb-12">
                 {otp.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    ref={(el) => (otpRefs.current[idx] = el)}
-                    type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleOtpChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(idx, e)}
-                    className="w-12 h-16 md:w-16 md:h-20 bg-slate-50 border-2 border-transparent rounded-[20px] text-center text-2xl font-black focus:border-indigo-600 outline-none transition-all shadow-inner"
-                  />
+                  <input key={idx} ref={(el) => (otpRefs.current[idx] = el)} type="text" maxLength={1} value={digit} onChange={(e) => handleOtpChange(idx, e.target.value)} onKeyDown={(e) => handleKeyDown(idx, e)} className="w-12 h-16 md:w-16 md:h-20 bg-slate-50 border-2 border-transparent rounded-[20px] text-center text-2xl font-black focus:border-indigo-600 outline-none transition-all shadow-inner" />
                 ))}
               </div>
-
-              <button 
-                onClick={handleVerify}
-                disabled={loading}
-                className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-indigo-600 transition-all disabled:opacity-50 active:scale-95"
-              >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Vérifier le Code'}
+              <button onClick={handleVerify} disabled={loading} className="w-full py-6 bg-slate-900 text-white rounded-[32px] font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-3xl hover:bg-indigo-600 transition-all disabled:opacity-50 active:scale-95">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Vérifier'}
               </button>
-
-              <div className="mt-8 text-center">
-                <button 
-                  onClick={() => handleInitialSubmit({ preventDefault: () => {} } as React.FormEvent)}
-                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600"
-                >
-                  Renvoyer le code
-                </button>
-              </div>
             </div>
           )}
         </div>

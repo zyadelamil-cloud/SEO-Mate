@@ -81,10 +81,10 @@ const Sidebar = ({ subscription, onLogout, t }: { subscription: UserSubscription
               <AlertTriangle className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">{t.nav_logout}</h3>
-            <p className="text-slate-500 font-medium text-sm mb-8">Confirm Logout?</p>
+            <p className="text-slate-500 font-medium text-sm mb-8">Confirmer la déconnexion ?</p>
             <div className="flex flex-col gap-3">
-              <button onClick={onLogout} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg active:scale-95">Yes</button>
-              <button onClick={() => setShowConfirm(false)} className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">No</button>
+              <button onClick={onLogout} className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg active:scale-95">Oui</button>
+              <button onClick={() => setShowConfirm(false)} className="w-full py-4 bg-slate-100 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">Non</button>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@ const Sidebar = ({ subscription, onLogout, t }: { subscription: UserSubscription
               {initial}
             </div>
             <div className="overflow-hidden">
-              <p className="text-xs font-black text-slate-900 truncate">{subscription.firstName || 'User'}</p>
+              <p className="text-xs font-black text-slate-900 truncate">{subscription.firstName || 'Expert'}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.nav_account}</p>
             </div>
           </Link>
@@ -185,57 +185,76 @@ const App: React.FC = () => {
   }, []);
 
   const fetchUserData = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      let { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (profile) {
-      setSubscription({
-        planName: profile.plan_name,
-        level: profile.level,
-        articlesLimit: profile.articles_limit,
-        usedArticles: profile.used_articles, // Fixed: used correct property mapping
-        firstName: profile.first_name,
-        features: profile.features || DEFAULT_SUBSCRIPTION.features
-      });
-    }
+      // Si le profil n'existe pas, on le crée
+      if (error && error.code === 'PGRST116') {
+        const newProfile = {
+          id: userId,
+          plan_name: DEFAULT_SUBSCRIPTION.planName,
+          level: DEFAULT_SUBSCRIPTION.level,
+          articles_limit: DEFAULT_SUBSCRIPTION.articlesLimit,
+          used_articles: 0,
+          first_name: session?.user?.user_metadata?.first_name || 'Expert',
+          features: DEFAULT_SUBSCRIPTION.features
+        };
+        const { data: createdProfile } = await supabase.from('profiles').insert([newProfile]).select().single();
+        profile = createdProfile;
+      }
 
-    const { data: userArticles } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      if (profile) {
+        setSubscription({
+          planName: profile.plan_name,
+          level: profile.level,
+          articlesLimit: profile.articles_limit,
+          usedArticles: profile.used_articles || 0,
+          firstName: profile.first_name,
+          features: profile.features || DEFAULT_SUBSCRIPTION.features
+        });
+      }
 
-    if (userArticles) {
-      setArticles(userArticles.map(a => ({
-        id: a.id,
-        title: a.title,
-        content: a.content,
-        metaDescription: a.meta_description,
-        hashtags: a.hashtags,
-        seoScore: a.seo_score,
-        status: a.status,
-        lang: a.lang,
-        createdAt: new Date(a.created_at).toLocaleDateString(),
-        timestamp: new Date(a.created_at).getTime()
-      })));
-    }
+      const { data: userArticles } = await supabase
+        .from('articles')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    const { data: userImages } = await supabase
-      .from('images_history')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      if (userArticles) {
+        setArticles(userArticles.map(a => ({
+          id: a.id,
+          title: a.title,
+          content: a.content,
+          metaDescription: a.meta_description,
+          hashtags: a.hashtags,
+          seoScore: a.seo_score,
+          status: a.status,
+          lang: a.lang,
+          createdAt: new Date(a.created_at).toLocaleDateString(),
+          timestamp: new Date(a.created_at).getTime()
+        })));
+      }
 
-    if (userImages) {
-      setImageHistory(userImages.map(img => ({
-        id: img.id,
-        prompt: img.prompt,
-        url: img.url,
-        createdAt: new Date(img.created_at).toLocaleDateString()
-      })));
+      const { data: userImages } = await supabase
+        .from('images_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (userImages) {
+        setImageHistory(userImages.map(img => ({
+          id: img.id,
+          prompt: img.prompt,
+          url: img.url,
+          createdAt: new Date(img.created_at).toLocaleDateString()
+        })));
+      }
+    } catch (err) {
+      console.error("Erreur de chargement profil:", err);
     }
   };
 
@@ -260,13 +279,13 @@ const App: React.FC = () => {
       const newUsed = subscription.usedArticles + 1;
       setSubscription(prev => ({ ...prev, usedArticles: newUsed }));
       await supabase.from('profiles').update({ used_articles: newUsed }).eq('id', session.user.id);
-      setToastMessage(lang === 'fr' ? "Persistance Cloud validée !" : "Cloud persistence verified!");
+      setToastMessage(lang === 'fr' ? "Enregistré avec succès !" : "Saved successfully!");
     }
   };
 
   const onSaveImage = async (prompt: string, url: string) => {
     if (!session) return;
-    const { data, error } = await supabase.from('images_history').insert([{
+    const { data } = await supabase.from('images_history').insert([{
       user_id: session.user.id,
       prompt,
       url
@@ -286,7 +305,7 @@ const App: React.FC = () => {
     const { error } = await supabase.from('articles').delete().eq('id', id);
     if (!error) {
       setArticles(prev => prev.filter(a => a.id !== id));
-      setToastMessage(lang === 'fr' ? "Supprimé de la base de données." : "Deleted from database.");
+      setToastMessage(lang === 'fr' ? "Supprimé." : "Deleted.");
     }
   };
 
