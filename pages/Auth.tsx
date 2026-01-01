@@ -15,7 +15,6 @@ import {
   Copy,
   CheckCircle2,
   Info,
-  ExternalLink,
   Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -157,7 +156,7 @@ CREATE TRIGGER on_auth_user_created
                     <Settings className="w-3 h-3" /> Solution rapide :
                   </p>
                   <ol className="text-[10px] text-red-700 font-medium space-y-1 list-decimal ml-4">
-                    <li>Allez dans <b>Authentication > Providers</b> dans Supabase.</li>
+                    <li>Allez dans <b>Authentication {" > "} Providers</b> dans Supabase.</li>
                     <li>Désactivez <b>"Confirm Email"</b>.</li>
                     <li>Réessayez de vous connecter.</li>
                   </ol>
