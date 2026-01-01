@@ -2,18 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIModelType, SEOConfig } from "../types";
 
-// Accès sécurisé à la clé API
-const getApiKey = () => {
-  return (window as any).process?.env?.API_KEY || "";
-};
-
-const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
-
 /**
  * Suggests relevant SEO keywords based on a topic.
  */
 export const suggestKeywords = async (topic: string) => {
-  const ai = getAI();
+  // Always use a named parameter for the API key and do not provide a fallback value.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: AIModelType.FAST,
     contents: `Suggest 5-8 relevant SEO keywords for the topic: ${topic}`,
@@ -25,7 +19,15 @@ export const suggestKeywords = async (topic: string) => {
       }
     }
   });
-  return JSON.parse(response.text || '[]');
+  
+  const text = response.text;
+  if (!text) return [];
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Failed to parse keywords:", text);
+    return [];
+  }
 };
 
 /**
@@ -36,7 +38,8 @@ export const generateSEOArticle = async (
   config: SEOConfig,
   model: AIModelType = AIModelType.PRO
 ) => {
-  const ai = getAI();
+  // Always use a named parameter for the API key and do not provide a fallback value.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: model,
     contents: `Write a high-quality SEO optimized article about: ${topic}. 
@@ -62,14 +65,17 @@ export const generateSEOArticle = async (
     }
   });
 
-  return JSON.parse(response.text || '{}');
+  const text = response.text;
+  if (!text) throw new Error("Empty response from AI");
+  return JSON.parse(text);
 };
 
 /**
  * Generates a hero image for the article using the image model.
  */
 export const generateHeroImage = async (topic: string, title: string) => {
-  const ai = getAI();
+  // Always use a named parameter for the API key and do not provide a fallback value.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
@@ -97,7 +103,8 @@ export const generateHeroImage = async (topic: string, title: string) => {
  * Remixes article content into social media posts.
  */
 export const remixForSocial = async (content: string) => {
-  const ai = getAI();
+  // Always use a named parameter for the API key and do not provide a fallback value.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: AIModelType.FAST,
     contents: `Remix the following article content into social media posts for Instagram, X (Twitter), and LinkedIn: ${content}`,
@@ -126,7 +133,9 @@ export const remixForSocial = async (content: string) => {
     }
   });
 
-  return JSON.parse(response.text || '{}');
+  const text = response.text;
+  if (!text) return null;
+  return JSON.parse(text);
 };
 
 /**
@@ -140,7 +149,8 @@ export const generateProfessionalEmail = async (
   language: string = "English",
   wordCount: number = 150
 ) => {
-  const ai = getAI();
+  // Always use a named parameter for the API key and do not provide a fallback value.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: AIModelType.FAST,
     contents: `Write a professional email. Target: ${target}. Context: ${context}. Tone: ${tone}. Goal: ${goal}. Language: ${language}. Word count target: roughly ${wordCount} words.`,
@@ -167,5 +177,7 @@ export const generateProfessionalEmail = async (
     }
   });
 
-  return JSON.parse(response.text || '{}');
+  const text = response.text;
+  if (!text) throw new Error("Empty response from AI");
+  return JSON.parse(text);
 };
