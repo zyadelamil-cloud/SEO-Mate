@@ -2,8 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIModelType, SEOConfig } from "../types";
 
-// Always initialize GoogleGenAI with the API key from process.env.API_KEY directly
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Accès sécurisé à la clé API
+const getApiKey = () => {
+  return (window as any).process?.env?.API_KEY || "";
+};
+
+const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
  * Suggests relevant SEO keywords based on a topic.
@@ -21,7 +25,6 @@ export const suggestKeywords = async (topic: string) => {
       }
     }
   });
-  // Use .text property to get the response string
   return JSON.parse(response.text || '[]');
 };
 
@@ -81,7 +84,6 @@ export const generateHeroImage = async (topic: string, title: string) => {
     }
   });
 
-  // Iterate through parts to find the image part (inlineData)
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) {
       const base64EncodeString: string = part.inlineData.data;

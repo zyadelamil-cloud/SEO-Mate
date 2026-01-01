@@ -71,8 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           createdAt: data.created_at
         });
       } else {
-        // If profile doesn't exist yet (trigger delay), retry once or set temporary state
-        console.warn('Profile not found for authenticated user, trigger might be lagging.');
+        console.warn('Profile not yet available, likely trigger delay.');
       }
     } catch (error: any) {
       console.error('Error fetching profile:', error.message || error);
@@ -102,9 +101,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     if (error) throw error;
     
-    // NOTE: Profile creation is now handled by the Database Trigger 'on_auth_user_created'.
-    // We don't need to insert here, but we can set the local user state optimistically
-    // if confirmation is disabled.
+    // Le profil est créé par le TRIGGER SQL dans Supabase.
+    // On met à jour l'état local pour une UI fluide.
     if (data.user) {
       setUser({
         id: data.user.id,
