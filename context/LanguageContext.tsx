@@ -10,7 +10,8 @@ interface LanguageContextProps {
 
 const LanguageContext = createContext<LanguageContextProps | undefined>(undefined);
 
-export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Fix: Remove React.FC and use explicit children prop type to resolve TS errors in consumers
+export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('seo-mate-lang');
     return (saved as Language) || 'en';

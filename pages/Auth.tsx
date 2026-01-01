@@ -14,8 +14,7 @@ import {
   Database,
   Copy,
   CheckCircle2,
-  Info,
-  Settings
+  Info
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -91,20 +90,23 @@ CREATE TRIGGER on_auth_user_created
         navigate('/');
       } else {
         await signup(formData.name, formData.email, formData.password);
-        setSuccessMsg('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+        setSuccessMsg('Compte créé avec succès ! Bienvenue dans la Forge.');
         setIsLogin(true);
       }
     } catch (err: any) {
       const msg = err.message || '';
-      console.error('Auth error:', err);
+      console.error('Auth error detailed:', err);
       
+      // Gestion fine des erreurs Supabase
       if (msg.toLowerCase().includes('invalid login credentials')) {
-        setError('Identifiants invalides. Vérifiez votre email ou votre mot de passe.');
+        setError('Email ou mot de passe incorrect. Veuillez vérifier vos accès.');
+      } else if (msg.toLowerCase().includes('user already registered') || msg.toLowerCase().includes('already registered')) {
+        setError('Cette adresse email est déjà associée à un compte.');
       } else if (msg.includes('42P01') || msg.includes('profiles') || msg.includes('schema cache')) {
-        setError('La base de données n\'est pas configurée.');
+        setError('La base de données n\'est pas encore configurée.');
         setShowSqlGuide(true);
       } else {
-        setError(msg || 'Une erreur est survenue.');
+        setError(msg || 'Une erreur est survenue lors de l\'authentification.');
       }
     } finally {
       setIsLoading(false);
@@ -139,15 +141,15 @@ CREATE TRIGGER on_auth_user_created
 
           {error && (
             <div className="p-5 rounded-2xl bg-red-50 border border-red-100 space-y-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                 <span className="text-sm font-bold text-red-700">{error}</span>
               </div>
 
               {showSqlGuide && (
                 <div className="mt-2 space-y-4">
                   <p className="text-[10px] text-red-600 font-black uppercase leading-relaxed">
-                    Action Requise : Exécutez le script SQL
+                    Action Requise : Exécutez le script SQL dans votre SQL Editor Supabase
                   </p>
                   <div className="relative">
                     <pre className="text-[10px] bg-slate-900 text-indigo-300 p-4 rounded-xl overflow-x-auto max-h-40 font-mono custom-scrollbar">
@@ -249,7 +251,11 @@ CREATE TRIGGER on_auth_user_created
           <p className="text-center text-sm font-medium text-slate-500">
             {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
             <button 
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+                setSuccessMsg('');
+              }}
               className="ml-2 text-indigo-600 font-black uppercase tracking-wider hover:underline"
             >
               {isLogin ? "S'inscrire" : "Se connecter"}

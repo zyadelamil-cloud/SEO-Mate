@@ -19,7 +19,8 @@ interface ContentContextProps {
 
 const ContentContext = createContext<ContentContextProps | undefined>(undefined);
 
-export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Fix: Remove React.FC and use explicit children prop type to resolve TS errors in consumers
+export const ContentProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dbReady, setDbReady] = useState(true);

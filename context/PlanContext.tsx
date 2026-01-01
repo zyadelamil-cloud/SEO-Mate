@@ -18,7 +18,8 @@ interface PlanContextProps {
 
 const PlanContext = createContext<PlanContextProps | undefined>(undefined);
 
-export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Fix: Remove React.FC and use explicit children prop type to resolve TS errors in consumers
+export const PlanProvider = ({ children }: { children: ReactNode }) => {
   // Initialized to BASIC for testing as requested by the user
   const [plan, setPlan] = useState<PlanType>(PlanType.BASIC);
 

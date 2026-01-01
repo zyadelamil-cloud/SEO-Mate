@@ -31,6 +31,7 @@ import {
   Loader2
 } from 'lucide-react';
 
+// Fix: Use standard function signature for ProtectedRoute to ensure children are correctly typed
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
   
@@ -185,7 +186,7 @@ const Sidebar = () => {
             onClick={() => setShowLogoutConfirm(false)}
           ></div>
           
-          <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="w-8 h-8" />
@@ -228,7 +229,8 @@ const Sidebar = () => {
   );
 };
 
-const App: React.FC = () => {
+// Fix: Use standard function signature for App component
+const App = () => {
   return (
     <AuthProvider>
       <PlanProvider>
