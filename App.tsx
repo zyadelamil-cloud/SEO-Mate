@@ -27,11 +27,21 @@ import {
   LogOut,
   X,
   AlertTriangle,
-  User as UserIcon
+  User as UserIcon,
+  Loader2
 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+  
   if (!isAuthenticated) return <Navigate to="/auth" />;
   return <>{children}</>;
 };
@@ -101,7 +111,6 @@ const Sidebar = () => {
         </div>
         
         <div className="mt-auto p-6 space-y-4">
-          {/* Account link moved to bottom for better accessibility and structure */}
           <Link
             to="/account"
             className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
@@ -120,7 +129,7 @@ const Sidebar = () => {
           <Link to="/account" className="flex items-center justify-between px-2 group mt-2 pt-2 border-t border-slate-50">
              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
-                  {user?.name?.[0].toUpperCase()}
+                  {user?.name?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-black text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">{user?.name}</span>
@@ -169,7 +178,6 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* --- LOGOUT CONFIRMATION MODAL --- */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div 

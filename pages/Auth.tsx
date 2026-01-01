@@ -12,7 +12,10 @@ import {
   Chrome,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Database,
+  Copy,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -26,6 +29,8 @@ const Auth: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showSqlGuide, setShowSqlGuide] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -33,9 +38,51 @@ const Auth: React.FC = () => {
     password: ''
   });
 
+  const SQL_SETUP = `-- 1. Tables de base
+CREATE TABLE public.profiles (
+  id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  name text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+CREATE TABLE public.items (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  type text NOT NULL,
+  data jsonb NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 2. Fonction automatique pour créer le profil (Évite les erreurs RLS)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, name)
+  VALUES (new.id, new.raw_user_meta_data->>'full_name');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Déclencheur (Trigger)
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 4. Sécurité (RLS)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Profiles: viewable by owner" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Profiles: updatable by owner" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Items: viewable by owner" ON public.items FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Items: insertable by owner" ON public.items FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Items: deletable by owner" ON public.items FOR DELETE USING (auth.uid() = user_id);`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowSqlGuide(false);
     setIsLoading(true);
 
     try {
@@ -46,17 +93,28 @@ const Auth: React.FC = () => {
       }
       navigate('/');
     } catch (err: any) {
-      setError(err.message);
+      if (err.message === 'DATABASE_SETUP_REQUIRED' || err.message.includes('schema cache')) {
+        setError('Configuration de la base de données requise.');
+        setShowSqlGuide(true);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const copySql = () => {
+    navigator.clipboard.writeText(SQL_SETUP);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
+
   return (
-    <div className="min-h-screen flex bg-white overflow-hidden">
+    <div className="min-h-screen flex bg-white overflow-hidden font-inter">
       {/* Left side: Form */}
-      <div className="flex-1 flex flex-col justify-center px-8 lg:px-24 z-10 bg-white">
-        <div className="max-w-md w-full mx-auto space-y-10">
+      <div className="flex-1 flex flex-col justify-center px-8 lg:px-24 z-10 bg-white overflow-y-auto">
+        <div className="max-w-md w-full mx-auto space-y-8 py-12">
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate('/')}>
             <div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-100">
               <Zap className="text-white w-6 h-6 fill-current" />
@@ -78,9 +136,31 @@ const Auth: React.FC = () => {
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold animate-in slide-in-from-top-2">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              {error}
+            <div className={`p-4 rounded-2xl border flex flex-col gap-3 animate-in slide-in-from-top-2 ${showSqlGuide ? 'bg-indigo-50 border-indigo-100' : 'bg-red-50 border-red-100'}`}>
+              <div className="flex items-center gap-3">
+                <AlertCircle className={`w-5 h-5 shrink-0 ${showSqlGuide ? 'text-indigo-600' : 'text-red-600'}`} />
+                <span className={`text-sm font-bold ${showSqlGuide ? 'text-indigo-700' : 'text-red-700'}`}>{error}</span>
+              </div>
+              
+              {showSqlGuide && (
+                <div className="mt-2 space-y-4">
+                  <p className="text-xs text-indigo-600 font-medium leading-relaxed">
+                    Les politiques RLS d'insertion manuelle peuvent échouer. Utilisez ce script pour installer un <strong>Trigger</strong> (déclencheur) qui créera votre profil automatiquement :
+                  </p>
+                  <div className="relative group">
+                    <pre className="text-[10px] bg-slate-900 text-indigo-300 p-4 rounded-xl overflow-x-auto max-h-40 font-mono">
+                      {SQL_SETUP}
+                    </pre>
+                    <button 
+                      onClick={copySql}
+                      className="absolute top-2 right-2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      {copiedSql ? <CheckCircle2 className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copiedSql ? 'Copié' : 'Copier SQL'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -160,20 +240,6 @@ const Auth: React.FC = () => {
             </button>
           </form>
 
-          <div className="relative flex items-center justify-center py-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-            <span className="relative px-4 bg-white text-[10px] font-black text-slate-400 uppercase tracking-widest">Ou continuer avec</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-3 py-4 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all font-bold text-sm text-slate-600">
-              <Chrome className="w-5 h-5" /> Google
-            </button>
-            <button className="flex items-center justify-center gap-3 py-4 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all font-bold text-sm text-slate-600">
-              <Github className="w-5 h-5" /> Github
-            </button>
-          </div>
-
           <p className="text-center text-sm font-medium text-slate-500">
             {isLogin ? "Vous n'avez pas de compte ?" : "Déjà un compte ?"}
             <button 
@@ -190,26 +256,17 @@ const Auth: React.FC = () => {
       <div className="hidden lg:flex flex-1 bg-slate-900 relative items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-indigo-600 mix-blend-multiply opacity-20"></div>
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-500/20 rounded-full blur-[120px] -mr-96 -mt-96"></div>
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[100px] -ml-48 -mb-48"></div>
         
         <div className="relative z-10 text-center space-y-8 p-20">
           <div className="inline-flex p-6 bg-white/10 backdrop-blur-3xl rounded-[40px] border border-white/10 shadow-2xl mb-8">
-            <Zap className="w-20 h-20 text-indigo-400 fill-indigo-400" />
+            <Database className="w-20 h-20 text-indigo-400" />
           </div>
           <h2 className="text-5xl font-black text-white leading-tight tracking-tight">
             Générez du contenu qui <br /> <span className="text-indigo-400">domine le classement.</span>
           </h2>
           <p className="text-white/40 text-lg font-medium max-w-md mx-auto italic">
-            "SEO-Mate a multiplié notre trafic organique par 4 en seulement 3 mois grâce à son IA optimisée."
+            Connectez votre base de données Supabase pour sauvegarder vos créations à vie.
           </p>
-          <div className="pt-10 flex flex-col items-center">
-             <div className="flex -space-x-3">
-                {[1,2,3,4].map(i => (
-                  <img key={i} src={`https://i.pravatar.cc/100?u=${i}`} className="w-12 h-12 rounded-full border-4 border-slate-900" alt="avatar" />
-                ))}
-             </div>
-             <p className="mt-4 text-white/60 text-xs font-black uppercase tracking-widest">+2,000 Experts SEO nous font confiance</p>
-          </div>
         </div>
       </div>
     </div>

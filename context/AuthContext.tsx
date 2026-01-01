@@ -1,7 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../services/supabase';
 
 interface User {
+  id: string;
   email: string;
   name: string;
   createdAt: string;
@@ -14,75 +16,130 @@ interface AuthContextProps {
   updateProfile: (name: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('seo-mate-user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!user;
+  useEffect(() => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchProfile(session.user.id, session.user.email!);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for changes on auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchProfile(session.user.id, session.user.email!);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (id: string, email: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === '42P01' || error.message.includes('schema cache')) {
+          throw new Error('DATABASE_SETUP_REQUIRED');
+        }
+        throw error;
+      }
+
+      if (data) {
+        setUser({
+          id,
+          email,
+          name: data.name || 'Utilisateur',
+          createdAt: data.created_at
+        });
+      } else {
+        // If profile doesn't exist yet (trigger delay), retry once or set temporary state
+        console.warn('Profile not found for authenticated user, trigger might be lagging.');
+      }
+    } catch (error: any) {
+      console.error('Error fetching profile:', error.message || error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const accounts = JSON.parse(localStorage.getItem('seo-mate-accounts') || '[]');
-    const found = accounts.find((a: any) => a.email === email && a.password === password);
-    
-    if (found) {
-      const userData = { 
-        email: found.email, 
-        name: found.name, 
-        createdAt: found.createdAt || new Date().toISOString() 
-      };
-      setUser(userData);
-      localStorage.setItem('seo-mate-user', JSON.stringify(userData));
-    } else {
-      throw new Error('Identifiants incorrects');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (error.message.includes('schema cache')) {
+        throw new Error('DATABASE_SETUP_REQUIRED');
+      }
+      throw error;
     }
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: {
+        data: { full_name: name }
+      }
+    });
     
-    const accounts = JSON.parse(localStorage.getItem('seo-mate-accounts') || '[]');
-    if (accounts.find((a: any) => a.email === email)) {
-      throw new Error('Cet email est déjà utilisé');
+    if (error) throw error;
+    
+    // NOTE: Profile creation is now handled by the Database Trigger 'on_auth_user_created'.
+    // We don't need to insert here, but we can set the local user state optimistically
+    // if confirmation is disabled.
+    if (data.user) {
+      setUser({
+        id: data.user.id,
+        email: data.user.email!,
+        name: name,
+        createdAt: new Date().toISOString()
+      });
     }
-
-    const createdAt = new Date().toISOString();
-    const newAccount = { name, email, password, createdAt };
-    accounts.push(newAccount);
-    localStorage.setItem('seo-mate-accounts', JSON.stringify(accounts));
-    
-    const userData = { email, name, createdAt };
-    setUser(userData);
-    localStorage.setItem('seo-mate-user', JSON.stringify(userData));
   };
 
   const updateProfile = async (newName: string) => {
     if (!user) return;
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const updatedUser = { ...user, name: newName };
-    setUser(updatedUser);
-    localStorage.setItem('seo-mate-user', JSON.stringify(updatedUser));
-    
-    const accounts = JSON.parse(localStorage.getItem('seo-mate-accounts') || '[]');
-    const updatedAccounts = accounts.map((a: any) => a.email === user.email ? { ...a, name: newName } : a);
-    localStorage.setItem('seo-mate-accounts', JSON.stringify(updatedAccounts));
+    const { error } = await supabase
+      .from('profiles')
+      .update({ name: newName })
+      .eq('id', user.id);
+
+    if (error) throw error;
+    setUser(prev => prev ? { ...prev, name: newName } : null);
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('seo-mate-user');
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, updateProfile, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      signup, 
+      updateProfile, 
+      logout, 
+      isAuthenticated: !!user,
+      isLoading
+    }}>
       {children}
     </AuthContext.Provider>
   );
