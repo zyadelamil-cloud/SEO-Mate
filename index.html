@@ -10,16 +10,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // Shim process.env pour éviter les crashs JS sur Netlify/Vercel
-      window.process = { env: { API_KEY: "" } };
+      // Shim process.env pour éviter les crashs JS sur Netlify
+      if (typeof window.process === 'undefined') {
+        window.process = { env: { API_KEY: "" } };
+      }
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        /* Custom scrollbar for better aesthetics */
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
     </style>
 <script type="importmap">
 {
@@ -36,7 +35,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="text-slate-900">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>

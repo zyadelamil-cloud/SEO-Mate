@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and sets the user
+    // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         fetchProfile(session.user.id, session.user.email!);
@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // Listen for changes on auth state
+    // Handle auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         fetchProfile(session.user.id, session.user.email!);
@@ -57,8 +57,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .maybeSingle();
 
       if (error) {
+        // Error code 42P01 means table does not exist
         if (error.code === '42P01' || error.message.includes('schema cache')) {
-          throw new Error('DATABASE_SETUP_REQUIRED');
+          console.error('Database setup required!');
+          setIsLoading(false);
+          return;
         }
         throw error;
       }
@@ -71,10 +74,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           createdAt: data.created_at
         });
       } else {
-        console.warn('Profile not yet available, likely trigger delay.');
+        // Profile not found yet (common after first signup, trigger takes time)
+        setUser({
+          id,
+          email,
+          name: 'Nouvel Utilisateur',
+          createdAt: new Date().toISOString()
+        });
       }
     } catch (error: any) {
-      console.error('Error fetching profile:', error.message || error);
+      console.error('Error fetching profile:', error);
     } finally {
       setIsLoading(false);
     }
@@ -82,16 +91,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message.includes('schema cache')) {
-        throw new Error('DATABASE_SETUP_REQUIRED');
-      }
-      throw error;
-    }
+    if (error) throw error;
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ 
+    // Signup using full_name in metadata so the trigger can pick it up
+    const { error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: {
@@ -100,17 +105,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
     
     if (error) throw error;
-    
-    // Le profil est créé par le TRIGGER SQL dans Supabase.
-    // On met à jour l'état local pour une UI fluide.
-    if (data.user) {
-      setUser({
-        id: data.user.id,
-        email: data.user.email!,
-        name: name,
-        createdAt: new Date().toISOString()
-      });
-    }
   };
 
   const updateProfile = async (newName: string) => {
