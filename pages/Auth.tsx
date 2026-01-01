@@ -29,7 +29,6 @@ const Auth: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showSqlGuide, setShowSqlGuide] = useState(false);
-  const [showAuthHelp, setShowAuthHelp] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -84,7 +83,6 @@ CREATE TRIGGER on_auth_user_created
     setError('');
     setSuccessMsg('');
     setShowSqlGuide(false);
-    setShowAuthHelp(false);
     setIsLoading(true);
 
     try {
@@ -93,7 +91,7 @@ CREATE TRIGGER on_auth_user_created
         navigate('/');
       } else {
         await signup(formData.name, formData.email, formData.password);
-        setSuccessMsg('Compte créé ! Vérifiez vos emails pour confirmer votre compte (ou désactivez la confirmation dans Supabase).');
+        setSuccessMsg('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
         setIsLogin(true);
       }
     } catch (err: any) {
@@ -101,11 +99,7 @@ CREATE TRIGGER on_auth_user_created
       console.error('Auth error:', err);
       
       if (msg.toLowerCase().includes('invalid login credentials')) {
-        setError('Identifiants invalides ou email non confirmé.');
-        setShowAuthHelp(true);
-      } else if (msg.includes('Email not confirmed')) {
-        setError('Veuillez confirmer votre adresse email.');
-        setShowAuthHelp(true);
+        setError('Identifiants invalides. Vérifiez votre email ou votre mot de passe.');
       } else if (msg.includes('42P01') || msg.includes('profiles') || msg.includes('schema cache')) {
         setError('La base de données n\'est pas configurée.');
         setShowSqlGuide(true);
@@ -149,19 +143,6 @@ CREATE TRIGGER on_auth_user_created
                 <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
                 <span className="text-sm font-bold text-red-700">{error}</span>
               </div>
-              
-              {showAuthHelp && (
-                <div className="bg-white/50 p-4 rounded-xl border border-red-100 space-y-3">
-                  <p className="text-[11px] font-bold text-red-800 leading-relaxed uppercase tracking-wider flex items-center gap-2">
-                    <Settings className="w-3 h-3" /> Solution rapide :
-                  </p>
-                  <ol className="text-[10px] text-red-700 font-medium space-y-1 list-decimal ml-4">
-                    <li>Allez dans <b>Authentication {" > "} Providers</b> dans Supabase.</li>
-                    <li>Désactivez <b>"Confirm Email"</b>.</li>
-                    <li>Réessayez de vous connecter.</li>
-                  </ol>
-                </div>
-              )}
 
               {showSqlGuide && (
                 <div className="mt-2 space-y-4">
